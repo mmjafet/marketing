@@ -8,6 +8,11 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import io
 import os
+import logging
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
@@ -174,7 +179,9 @@ def plot_pca_clusters(df, n_components=3, n_clusters=3):
 def check_data_loaded():
     global df_global
     if df_global is None:
-        return False, jsonify({"error": "No hay datos cargados."}), 400
+        return False, jsonify({"error": "No hay datos cargados. Utiliza POST /upload para cargar un archivo CSV."}), 400
+    if isinstance(df_global, str):
+        return False, jsonify({"error": f"Error con los datos: {df_global}"}), 400
     return True, None, None
 
 @app.route('/')
@@ -257,6 +264,58 @@ def plot_pca():
         return resp, code
     img = plot_pca_clusters(df_global)
     return Response(img.getvalue(), mimetype='image/png')
+
+# Añadir un endpoint para cargar datos
+@app.route('/upload', methods=['POST'])
+def upload_file():
+    global df_global
+    
+    if 'file' not in request.files:
+        return jsonify({"error": "No se envió ningún archivo"}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No se seleccionó ningún archivo"}), 400
+    
+    # Guardar el archivo temporalmente
+    temp_path = 'temp_data.csv'
+    file.save(temp_path)
+    
+    # Cargar los datos
+    df_global = load_data(temp_path)
+    
+    if isinstance(df_global, str):
+        return jsonify({"error": f"Error al cargar el archivo: {df_global}"}), 400
+    
+    # Preprocesar los datos
+    df_global = preprocess_data(df_global)
+    
+    return jsonify({
+        "message": "Archivo cargado correctamente",
+        "rows": df_global.shape[0],
+        "columns": df_global.shape[1],
+        "column_names": list(df_global.columns)
+    })
+
+# Añadir un endpoint para verificar el estado de los datos
+@app.route('/status')
+def status():
+    global df_global
+    
+    if df_global is None:
+        return jsonify({"status": "No hay datos cargados"})
+    elif isinstance(df_global, str):
+        return jsonify({"status": "Error", "message": df_global})
+    else:
+        return jsonify({
+            "status": "Datos cargados",
+            "rows": df_global.shape[0],
+            "columns": df_global.shape[1],
+            "column_names": list(df_global.columns),
+            "has_sales_column": "SALES" in df_global.columns,
+            "has_orderdate_column": "ORDERDATE" in df_global.columns,
+            "numeric_columns": list(df_global.select_dtypes(include=['number']).columns)
+        })
 
 if __name__ == '__main__':
     if os.path.exists(DATA_FILE):
