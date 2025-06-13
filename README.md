@@ -66,3 +66,4 @@ marketing-dashboard
 
 This project utilizes various libraries including Flask, Pandas, Matplotlib, Seaborn, and Plotly for data processing and visualization.# representacion_graficas_marketing
 # marketing
+# marketing
