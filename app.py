@@ -14,14 +14,19 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Definir variables globales
+DATA_FILE = 'data/sales_data_sample.csv'
+df_global = None
+data_initialized = False  # Flag para rastrear si los datos se han inicializado
+
 app = Flask(__name__)
 
-# Función para cargar datos al iniciar
-@app.before_first_request
+# Función para cargar datos
 def initialize_data():
-    global df_global
+    global df_global, data_initialized
+    
     # Si ya hay datos cargados, no hacemos nada
-    if df_global is not None and not isinstance(df_global, str):
+    if data_initialized:
         return
     
     logger.info("Intentando cargar datos iniciales...")
@@ -34,9 +39,13 @@ def initialize_data():
             logger.error(f"Error cargando {DATA_FILE}: {df_global}")
     else:
         logger.warning(f"Archivo {DATA_FILE} no encontrado. Carga un archivo con POST /upload para usar la API.")
+    
+    data_initialized = True
 
-DATA_FILE = 'data/sales_data_sample.csv'
-df_global = None
+# Middleware para inicializar datos antes de cualquier solicitud
+@app.before_request
+def before_request_func():
+    initialize_data()
 
 # --- Funciones de procesamiento ---
 
